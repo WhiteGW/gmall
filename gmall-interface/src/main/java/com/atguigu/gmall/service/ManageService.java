@@ -55,8 +55,20 @@ public interface ManageService {
 
     /**
      * spn产品信息
-     * @param spuInfo
+     * @param catalog3Id
      * @return
      */
-    List<SpuInfo> getSpuInfoList(SpuInfo spuInfo);
+    List<SpuInfo> getSpuInfoList(String catalog3Id);
+
+    /**
+     * 回显销售属性
+     * @return
+     */
+    List<BaseSaleAttr> getBaseSaleAttrList();
+
+    /**
+     * 保存数据
+     * @param spuInfo
+     */
+    void saveSpuInfo(SpuInfo spuInfo);
 }

@@ -19,6 +19,7 @@
 	</properties>
 
 	<dependencies>
+
 		<dependency>
 			<groupId>com.atguigu.gmall</groupId>
 			<artifactId>gmall-interface</artifactId>
@@ -30,13 +31,14 @@
 			<artifactId>gmall-web-util</artifactId>
 			<version>1.0-SNAPSHOT</version>
 		</dependency>
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter-api</artifactId>
-            <version>5.5.2</version>
-        </dependency>
 
-    </dependencies>
+		<dependency>
+			<groupId>org.csource</groupId>
+			<artifactId>fastdfs-client-java</artifactId>
+			<version>1.27</version>
+		</dependency>
+
+	</dependencies>
 
 	<build>
 		<plugins>
