@@ -36,8 +36,9 @@ public class ManageController {
 
 //    http://localhost:8082/attrInfoList?catalog3Id=61
     @RequestMapping("attrInfoList")
-    public List<BaseAttrInfo> attrInfoList(BaseAttrInfo baseAttrInfo){
-        return manageService.getAttrInfoList(baseAttrInfo);
+    public List<BaseAttrInfo> attrInfoList(BaseAttrInfo baseAttrInfo,String catalog3Id){
+//        return manageService.getAttrInfoList(baseAttrInfo);
+        return manageService.getAttrInfoList(catalog3Id);
     }
 
     // http://localhost:8082/saveAttrInfo
