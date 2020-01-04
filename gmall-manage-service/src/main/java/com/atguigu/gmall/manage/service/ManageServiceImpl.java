@@ -1,13 +1,24 @@
 package com.atguigu.gmall.manage.service;
 
 import com.alibaba.dubbo.config.annotation.Service;
+import com.alibaba.fastjson.JSON;
 import com.atguigu.gmall.bean.*;
+import com.atguigu.gmall.config.RedisUtil;
+import com.atguigu.gmall.manage.constant.ManageConst;
 import com.atguigu.gmall.manage.mapper.*;
 import com.atguigu.gmall.service.ManageService;
+import org.redisson.Redisson;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
+import org.redisson.config.Config;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
+import redis.clients.jedis.Jedis;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 @Service
 public class ManageServiceImpl implements ManageService {
@@ -40,6 +51,8 @@ public class ManageServiceImpl implements ManageService {
     private SkuAttrValueMapper skuAttrValueMapper;
     @Autowired
     private SkuSaleAttrValueMapper skuSaleAttrValueMapper;
+    @Autowired
+    private RedisUtil redisUtil;
 
     @Override
     public List<BaseCatalog1> getCatalog1() {
@@ -196,6 +209,127 @@ public class ManageServiceImpl implements ManageService {
                 skuSaleAttrValueMapper.insertSelective(skuSaleAttrValue);
             }
         }
+    }
+
+    @Override
+    public SkuInfo getSkuInfo(String skuId) {
+        return getSkuInfoRedisson(skuId);
+//        return getSkuInfoByRedisSet(skuId);
+    }
+
+    private SkuInfo getSkuInfoRedisson(String skuId) {
+        SkuInfo skuInfo = null;
+        Jedis jedis = null;
+        try {
+            //获取jedis
+            jedis = redisUtil.getJedis();
+            //定义key:sku:skuId:info
+            String skuKey = ManageConst.SKUKEY_PREFIX + skuId + ManageConst.SKUKEY_SUFFIX;
+            String skuJson = jedis.get(skuKey);
+            if(skuJson == null){
+                //没有数据
+                //加锁
+                Config config = new Config();
+//                设置redis节点
+                config.useSingleServer().setAddress("redis://192.168.129.130:6379");
+                //创建Redisson实例
+                RedissonClient redisson = Redisson.create(config);
+                //创建锁
+                RLock lock = redisson.getLock("myLock");
+                boolean res = lock.tryLock(100, 10, TimeUnit.SECONDS);
+                if(res){
+                    try {
+                        // 从数据库查询数据
+                        skuInfo = getSkuInfoDB(skuId);
+                        // 将数据放入缓存
+                        // jedis.set(userKey,JSON.toJSONString(skuInfo));
+                        jedis.setex(skuKey,ManageConst.SKUKEY_TIMEOUT, JSON.toJSONString(skuInfo));
+                        return skuInfo;
+                    } finally {
+                        lock.unlock();
+                    }
+                }
+            }else {
+                skuInfo = JSON.parseObject(skuJson,SkuInfo.class);
+                return skuInfo;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            if(jedis != null) {
+                jedis.close();
+            }
+        }
+        return getSkuInfoDB(skuId);
+    }
+
+    private SkuInfo getSkuInfoByRedisSet(String skuId) {
+        SkuInfo skuInfo = null;
+        Jedis jedis = null;
+        try {
+            //获取jedis
+            jedis = redisUtil.getJedis();
+            //定义key:sku:skuId:info
+            String skuKey = ManageConst.SKUKEY_PREFIX + skuId + ManageConst.SKUKEY_SUFFIX;
+            String skuJson = jedis.get(skuKey);
+            if(skuJson == null){
+                //没有数据
+                System.err.println("缓存中没有数据！！！");
+                //准备加锁！ set k1 v1 px 10000 nx
+                //定义锁的key sku:skuId:lock k1
+                String skuLockKey = ManageConst.SKUKEY_PREFIX + skuId + ManageConst.SKULOCK_SUFFIX;
+                //定义key锁定的值 v1
+                String token = UUID.randomUUID().toString().replace("-", "");
+                //执行加锁命令
+                String lockKey = jedis.set(skuLockKey, token, "NX", "PX", ManageConst.SKULOCK_EXPIRE_PX);
+                if("OK".equals(lockKey)){
+                    System.err.println("上锁成功");
+                    //放入缓存
+                    skuInfo = getSkuInfoDB(skuId);
+                    jedis.setex(skuKey, ManageConst.SKUKEY_TIMEOUT , JSON.toJSONString(skuId));
+                    //解锁
+//                    jedis.del(skuKey);  lua脚本
+                    String script ="if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end";
+                    jedis.eval(script, Collections.singletonList(skuLockKey),Collections.singletonList(token));
+
+                    return  skuInfo;
+                }else{
+                    //等一等
+                    Thread.sleep(1000);
+                    return getSkuInfo(skuId);
+                }
+            }else{
+                skuInfo = JSON.parseObject(skuJson,SkuInfo.class);
+                return skuInfo;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            if(jedis != null){
+                jedis.close();
+            }
+        }
+        return getSkuInfoDB(skuId);
+    }
+
+    //抽取方法单独走数据库
+    private SkuInfo getSkuInfoDB(String skuId) {
+        SkuInfo skuInfo = skuInfoMapper.selectByPrimaryKey(skuId);
+        SkuImage skuImage = new SkuImage();
+        skuImage.setSkuId(skuId);
+        List<SkuImage> select = skuImageMapper.select(skuImage);
+        skuInfo.setSkuImageList(select);
+        return skuInfo;
+    }
+
+    @Override
+    public List<SpuSaleAttr> getSpuSaleAttrListCheckBySku(SkuInfo skuInfo) {
+        return spuSaleAttrMapper.selectSpuSaleAttrListCheckBySku(skuInfo.getId(),skuInfo.getSpuId());
+    }
+
+    @Override
+    public List<SkuSaleAttrValue> getSkuSaleAttrValueListBySpu(String spuId) {
+        return skuSaleAttrValueMapper.selectSkuSaleAttrValueListBySpu(spuId);
     }
 }
 
