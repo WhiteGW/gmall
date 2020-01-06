@@ -236,11 +236,15 @@ public class ManageServiceImpl implements ManageService {
                 RedissonClient redisson = Redisson.create(config);
                 //创建锁
                 RLock lock = redisson.getLock("myLock");
+                System.out.println("redisson 分布式锁！");
                 boolean res = lock.tryLock(100, 10, TimeUnit.SECONDS);
                 if(res){
                     try {
                         // 从数据库查询数据
                         skuInfo = getSkuInfoDB(skuId);
+                        if(skuInfo == null){
+                            jedis.setex(skuKey,ManageConst.SKUKEY_TIMEOUT,"");
+                        }
                         // 将数据放入缓存
                         // jedis.set(userKey,JSON.toJSONString(skuInfo));
                         jedis.setex(skuKey,ManageConst.SKUKEY_TIMEOUT, JSON.toJSONString(skuInfo));
@@ -317,8 +321,13 @@ public class ManageServiceImpl implements ManageService {
         SkuInfo skuInfo = skuInfoMapper.selectByPrimaryKey(skuId);
         SkuImage skuImage = new SkuImage();
         skuImage.setSkuId(skuId);
-        List<SkuImage> select = skuImageMapper.select(skuImage);
-        skuInfo.setSkuImageList(select);
+        List<SkuImage> imageList = skuImageMapper.select(skuImage);
+        skuInfo.setSkuImageList(imageList);
+        System.out.println("hh");
+        SkuAttrValue skuAttrValue = new SkuAttrValue();
+        skuAttrValue.setSkuId(skuId);
+        skuInfo.setSkuAttrValueList(skuAttrValueMapper.select(skuAttrValue));
+        System.out.println(skuAttrValue.getSkuId());
         return skuInfo;
     }
 
