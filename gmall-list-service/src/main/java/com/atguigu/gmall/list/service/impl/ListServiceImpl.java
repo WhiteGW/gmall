@@ -4,11 +4,13 @@ import com.alibaba.dubbo.config.annotation.Service;
 import com.atguigu.gmall.bean.SkuLsInfo;
 import com.atguigu.gmall.bean.SkuLsParams;
 import com.atguigu.gmall.bean.SkuLsResult;
+import com.atguigu.gmall.config.RedisUtil;
 import com.atguigu.gmall.service.ListService;
 import io.searchbox.client.JestClient;
 import io.searchbox.core.Index;
 import io.searchbox.core.Search;
 import io.searchbox.core.SearchResult;
+import io.searchbox.core.Update;
 import io.searchbox.core.search.aggregation.TermsAggregation;
 import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.MatchQueryBuilder;
@@ -20,6 +22,7 @@ import org.elasticsearch.search.builder.SearchSourceBuilder;
 import org.elasticsearch.search.highlight.HighlightBuilder;
 import org.elasticsearch.search.sort.SortOrder;
 import org.springframework.beans.factory.annotation.Autowired;
+import redis.clients.jedis.Jedis;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -30,6 +33,8 @@ public class ListServiceImpl implements ListService {
 
     @Autowired
     private JestClient jestClient;
+    @Autowired
+    private RedisUtil redisUtil;
 
     public static final String ES_INDEX="gmall";
 
@@ -75,6 +80,32 @@ public class ListServiceImpl implements ListService {
         // 制作返回结果集
         SkuLsResult skuLsResult = makeResultForSearch(searchResult, skuLsParams);
         return skuLsResult;
+    }
+
+    @Override
+    public void incrHotScore(String skuId) {
+        Jedis jedis = redisUtil.getJedis();
+        //zSet
+        Double hotScore = jedis.zincrby("hotScore", 1, "skuId" + skuId);
+        if(hotScore % 10 == 0){
+            //更新es
+            updateHotScore(skuId, Math.round(hotScore));
+        }
+    }
+
+    private void updateHotScore(String skuId, long hotScore) {
+        String updateJson="{\n" +
+                "   \"doc\":{\n" +
+                "     \"hotScore\":"+hotScore+"\n" +
+                "   }\n" +
+                "}";
+
+        Update update = new Update.Builder(updateJson).index(ES_INDEX).type(ES_TYPE).id(skuId).build();
+        try {
+            jestClient.execute(update);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     // 返回结果集

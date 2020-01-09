@@ -6,6 +6,8 @@ import com.atguigu.gmall.bean.SkuAttrValue;
 import com.atguigu.gmall.bean.SkuInfo;
 import com.atguigu.gmall.bean.SkuSaleAttrValue;
 import com.atguigu.gmall.bean.SpuSaleAttr;
+import com.atguigu.gmall.config.LoginRequire;
+import com.atguigu.gmall.service.ListService;
 import com.atguigu.gmall.service.ManageService;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -21,7 +23,10 @@ public class ItemController {
 
     @Reference
     private ManageService manageService;
+    @Reference
+    private ListService listService;
 
+    @LoginRequire
     @RequestMapping("{skuId}.html")
     public String skuInfoPage(@PathVariable(value = "skuId") String skuId, HttpServletRequest request){
         System.err.println(skuId);
@@ -59,6 +64,8 @@ public class ItemController {
         request.setAttribute("valuesSkuJson",valuesSkuJson);
         request.setAttribute("spuSaleAttrList",spuSaleAttrList);
         request.setAttribute("skuInfo", skuInfo);
+        //记录热度排名
+        listService.incrHotScore(skuId);
         return "item";
     }
 

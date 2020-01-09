@@ -26,6 +26,10 @@ public class ListController {
     @RequestMapping("list.html")
     //@ResponseBody
     public String getList(SkuLsParams skuLsParams, HttpServletRequest request){
+
+        //设置每页显示条数
+        skuLsParams.setPageSize(3);
+
         SkuLsResult skuLsResult = listService.search(skuLsParams);
         //获取所有的商品信息
         List<SkuLsInfo> skuLsInfoList = skuLsResult.getSkuLsInfoList();
@@ -66,9 +70,6 @@ public class ListController {
             }
         }
 
-
-        //设置每页显示条数
-        skuLsParams.setPageSize(3);
         //保存数据
         request.setAttribute("totalPages",skuLsResult.getTotalPages());
         request.setAttribute("pageNo",skuLsParams.getPageNo());
