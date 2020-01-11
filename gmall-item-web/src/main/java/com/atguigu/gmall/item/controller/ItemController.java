@@ -26,7 +26,7 @@ public class ItemController {
     @Reference
     private ListService listService;
 
-    @LoginRequire
+    @LoginRequire(autoRedirect = false)
     @RequestMapping("{skuId}.html")
     public String skuInfoPage(@PathVariable(value = "skuId") String skuId, HttpServletRequest request){
         System.err.println(skuId);

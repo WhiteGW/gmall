@@ -4,12 +4,14 @@ import com.alibaba.dubbo.config.annotation.Reference;
 import com.atguigu.gmall.bean.UserAddress;
 import com.atguigu.gmall.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
-@RestController
+//@RestController
+@Controller
 public class OrderController {
 
     @Reference
@@ -19,7 +21,8 @@ public class OrderController {
      * 根据用户Id查询收货地址列表
      */
     @RequestMapping("trade")
-    public List<UserAddress> trade(String userId){
-        return userService.findUserAddressByUserId(userId);
+    public String trade(String userId){
+
+        return "trade";
     }
 }
